@@ -1,0 +1,25 @@
+# pvc-example.yaml
+# Creates a PersistentVolumeClaim using the Linode Block Storage CSI driver
+# The CSI driver will automatically provision a Linode block storage volume
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: production-data
+  namespace: production
+  labels:
+    app: storage-demo
+spec:
+  # Use linode-block-storage-retain to keep the volume if the PVC is deleted
+  # Use linode-block-storage if you want the volume deleted with the PVC
+  storageClassName: linode-block-storage-retain
+
+  accessModes:
+    # ReadWriteOnce: the volume can be mounted read-write by a single node
+    # This is the only mode supported by Linode Block Storage
+    # For shared storage across nodes, use an NFS-backed storage class
+    - ReadWriteOnce
+
+  resources:
+    requests:
+      # Minimum size on LKE is 10Gi
+      storage: 10Gi

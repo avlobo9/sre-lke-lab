@@ -1,0 +1,67 @@
+# statefulset-with-storage.yaml
+# StatefulSets are the correct way to run stateful workloads like databases
+# Each pod gets a stable identity (stateful-app-0, -1, -2) and its own PVC
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stateful-app
+  namespace: production
+spec:
+  serviceName: stateful-app-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: stateful-app
+  template:
+    metadata:
+      labels:
+        app: stateful-app
+    spec:
+      containers:
+        - name: app
+          image: nginx:stable
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            # Each pod mounts its own volume at /data
+            # Pod 0 gets data-stateful-app-0
+            # Pod 1 gets data-stateful-app-1
+            # Pod 2 gets data-stateful-app-2
+            - name: data
+              mountPath: /data
+
+  # volumeClaimTemplates automatically creates a PVC for each pod
+  # These PVCs persist even if the StatefulSet is deleted
+  # You must delete them manually: kubectl delete pvc -l app=stateful-app
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: linode-block-storage-retain
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Headless service required for StatefulSet stable DNS names
+# Pods are reachable at: stateful-app-0.stateful-app-headless.production.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: stateful-app-headless
+  namespace: production
+spec:
+  # clusterIP: None makes this a headless service
+  # DNS returns pod IPs directly instead of a single cluster IP
+  clusterIP: None
+  selector:
+    app: stateful-app
+  ports:
+    - port: 80
+      targetPort: 80

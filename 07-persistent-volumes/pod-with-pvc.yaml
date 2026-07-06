@@ -1,0 +1,35 @@
+# pod-with-pvc.yaml
+# Deploys a pod that mounts the PersistentVolumeClaim created in pvc-example.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-demo
+  namespace: production
+  labels:
+    app: storage-demo
+spec:
+  containers:
+    - name: app
+      image: nginx:stable
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+      volumeMounts:
+        # Mount the persistent volume at /data inside the container
+        - name: data-volume
+          mountPath: /data
+
+  volumes:
+    # Reference the PVC created in pvc-example.yaml
+    - name: data-volume
+      persistentVolumeClaim:
+        claimName: production-data
+
+  # Ensure the pod restarts the volume gracefully
+  # terminationGracePeriodSeconds gives the app time to flush data to disk
+  terminationGracePeriodSeconds: 30
