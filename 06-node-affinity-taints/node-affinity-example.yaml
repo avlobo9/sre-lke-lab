@@ -1,0 +1,60 @@
+# node-affinity-example.yaml
+# Demonstrates node affinity — scheduling a pod to a specific type of node
+#
+# Prerequisites: Label your nodes first:
+#   kubectl label node <NODE_NAME> workload-type=database
+apiVersion: v1
+kind: Pod
+metadata:
+  name: affinity-demo
+  namespace: default
+spec:
+  affinity:
+    nodeAffinity:
+      # requiredDuringSchedulingIgnoredDuringExecution = hard requirement
+      # Pod will stay Pending indefinitely if no matching node exists
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              # Node must have the label workload-type=database
+              - key: workload-type
+                operator: In
+                values:
+                  - database
+
+      # preferredDuringSchedulingIgnoredDuringExecution = soft preference
+      # Scheduler will try this first but will place elsewhere if needed
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100  # Higher weight = stronger preference (1-100)
+          preference:
+            matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                  - us-east-1a
+
+    # Pod anti-affinity — spread replicas across different nodes
+    # This ensures two replicas never land on the same node
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                    - affinity-demo
+            # Spread across nodes (use topology.kubernetes.io/zone for zone spreading)
+            topologyKey: kubernetes.io/hostname
+
+  containers:
+    - name: nginx
+      image: nginx:stable
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi

@@ -1,0 +1,62 @@
+# pod-disruption-budget.yaml
+# PDBs guarantee minimum availability during voluntary disruptions
+# such as node drains, cluster upgrades, and maintenance windows
+#
+# IMPORTANT: PDBs protect against voluntary disruptions only.
+# They do NOT protect against involuntary disruptions like node crashes.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: production-app-pdb
+  # Apply PDB in the namespace where your workload runs
+  namespace: production
+spec:
+  # minAvailable: at least 2 pods must be running at all times
+  # kubectl drain will block and wait if draining would violate this
+  minAvailable: 2
+
+  # Alternatively use maxUnavailable instead of minAvailable:
+  # maxUnavailable: 1  # At most 1 pod can be unavailable at a time
+
+  # Selector must match the labels of the pods you want to protect
+  selector:
+    matchLabels:
+      app: production-app
+---
+# Example Deployment that the PDB protects
+# This deployment must have at least 3 replicas for the PDB
+# minAvailable: 2 to make sense (can only drain if 2 remain)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: production-app
+  namespace: production
+spec:
+  # Must be greater than minAvailable for the PDB to allow any disruption
+  replicas: 3
+  selector:
+    matchLabels:
+      app: production-app
+  template:
+    metadata:
+      labels:
+        app: production-app
+    spec:
+      # Spread across nodes using pod anti-affinity
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: production-app
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: app
+          image: nginx:stable
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi

@@ -1,0 +1,44 @@
+# taints-tolerations-example.yaml
+# Demonstrates tolerations — allowing a pod to schedule on a tainted node
+#
+# Prerequisites: Taint a node first:
+#   kubectl taint node <NODE_NAME> dedicated=gpu:NoSchedule
+apiVersion: v1
+kind: Pod
+metadata:
+  name: toleration-demo
+  namespace: default
+spec:
+  containers:
+    - name: nginx
+      image: nginx:stable
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+  # Tolerations allow this pod to be scheduled on tainted nodes
+  tolerations:
+    # This toleration matches the taint: dedicated=gpu:NoSchedule
+    - key: dedicated
+      operator: Equal
+      value: gpu
+      # NoSchedule means: allow scheduling on this node
+      # NoExecute would also prevent eviction from existing pods
+      effect: NoSchedule
+
+    # Tolerate node not ready for up to 60 seconds before evicting
+    # This is useful for pods that need time to handle graceful shutdown
+    - key: node.kubernetes.io/not-ready
+      operator: Exists
+      effect: NoExecute
+      tolerationSeconds: 60
+
+    # Tolerate unreachable nodes for up to 60 seconds
+    - key: node.kubernetes.io/unreachable
+      operator: Exists
+      effect: NoExecute
+      tolerationSeconds: 60

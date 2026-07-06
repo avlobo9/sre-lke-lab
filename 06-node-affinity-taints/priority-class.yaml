@@ -1,0 +1,45 @@
+# priority-class.yaml
+# Priority Classes define which pods get resources first and which get evicted last
+# when the cluster is under resource pressure
+#
+# Eviction order (lowest priority evicted first):
+# 1. BestEffort (no requests or limits)
+# 2. Burstable (requests < limits)
+# 3. Guaranteed (requests == limits)
+# Priority Class overrides this order within the same QoS tier
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sre-critical
+# Higher value = higher priority (max is 1 billion)
+# System critical pods use values around 2 billion
+# User-defined classes should stay below 1 billion
+value: 1000000
+# globalDefault: false means this class is NOT applied to pods that don't specify one
+globalDefault: false
+description: "Critical SRE infrastructure components that must not be evicted"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sre-high
+value: 100000
+globalDefault: false
+description: "High priority production workloads"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sre-default
+# Set this as the default so all pods without an explicit class get this value
+value: 1000
+globalDefault: true
+description: "Default priority for all workloads that do not specify a class"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sre-low
+value: 100
+globalDefault: false
+description: "Low priority batch and background jobs that can be evicted freely"
