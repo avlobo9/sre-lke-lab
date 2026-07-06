@@ -1,0 +1,37 @@
+# default-deny-all.yaml
+# This is the foundation of network security in Kubernetes
+# Apply this first in every namespace, then explicitly allow what is needed
+#
+# This policy selects ALL pods in the namespace (empty podSelector)
+# and denies ALL ingress and egress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: production
+spec:
+  # Empty podSelector matches ALL pods in the namespace
+  podSelector: {}
+  # Specifying both policyTypes without any rules = deny all
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow DNS egress — without this, pods cannot resolve service names
+# This must always accompany a default-deny-all policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: production
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        # Allow UDP and TCP DNS on port 53
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

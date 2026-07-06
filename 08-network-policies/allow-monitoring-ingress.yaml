@@ -1,0 +1,26 @@
+# allow-monitoring-ingress.yaml
+# Allows the monitoring namespace to scrape metrics from all pods
+# This is needed so Prometheus can collect metrics from pods in production
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-ingress
+  namespace: production
+spec:
+  # Applies to ALL pods in production (they all expose metrics)
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Allow ingress from any pod in the monitoring namespace
+        - namespaceSelector:
+            matchLabels:
+              environment: monitoring
+      ports:
+        # Standard Prometheus metrics port
+        - port: 9090
+          protocol: TCP
+        # Alternate metrics port used by some exporters
+        - port: 8080
+          protocol: TCP
