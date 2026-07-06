@@ -1,0 +1,19 @@
+# prometheus-service.yaml
+# Exposes Prometheus within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  # ClusterIP makes the service reachable only within the cluster
+  # Use port-forward for local access during lab work
+  type: ClusterIP
+  selector:
+    app: prometheus
+  ports:
+    - name: web
+      port: 9090
+      targetPort: 9090

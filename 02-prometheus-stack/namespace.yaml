@@ -1,0 +1,11 @@
+# namespace.yaml
+# Creates a dedicated namespace for all monitoring components
+# Isolating monitoring in its own namespace is a production best practice
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    # Labels help with network policies and RBAC targeting
+    purpose: observability
+    managed-by: sre-team

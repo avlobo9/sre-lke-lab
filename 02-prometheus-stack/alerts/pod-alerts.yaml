@@ -1,0 +1,51 @@
+# pod-alerts.yaml
+# Alerting rules for pod-level health
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-alert-rules
+  namespace: monitoring
+data:
+  pod-alerts.yaml: |
+    groups:
+      - name: pod-alerts
+        rules:
+          # Alert when a pod is in CrashLoopBackOff
+          - alert: PodCrashLoopBackOff
+            expr: kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod is in CrashLoopBackOff"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is in CrashLoopBackOff"
+
+          # Alert when a pod has been pending for more than 5 minutes
+          - alert: PodPendingTooLong
+            expr: kube_pod_status_phase{phase="Pending"} == 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Pod has been pending for too long"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has been pending for more than 5 minutes"
+
+          # Alert when a PVC is not bound
+          - alert: PVCNotBound
+            expr: kube_persistentvolumeclaim_status_phase{phase!="Bound"} == 1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "PVC is not bound"
+              description: "PVC {{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }} is not bound"
+
+          # Alert when a deployment has fewer replicas than desired
+          - alert: DeploymentReplicasMismatch
+            expr: kube_deployment_spec_replicas != kube_deployment_status_available_replicas
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Deployment replica count mismatch"
+              description: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has {{ $value }} available replicas but desires more"

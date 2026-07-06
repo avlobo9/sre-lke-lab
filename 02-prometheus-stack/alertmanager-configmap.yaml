@@ -1,0 +1,65 @@
+# alertmanager-configmap.yaml
+# Alertmanager routes alerts to notification channels
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      # Default time to wait before sending a resolved notification
+      resolve_timeout: 5m
+
+    # Route tree — determines where each alert goes
+    route:
+      # Default receiver for alerts that don't match any child routes
+      receiver: 'slack-notifications'
+      # Group alerts by these labels to reduce noise
+      group_by: ['alertname', 'namespace']
+      # Wait to collect more alerts before sending first notification
+      group_wait: 30s
+      # Wait before sending new alerts for an existing group
+      group_interval: 5m
+      # Wait before resending an alert that is still firing
+      repeat_interval: 4h
+
+      routes:
+        # Critical alerts get sent immediately
+        - match:
+            severity: critical
+          receiver: 'slack-critical'
+          group_wait: 10s
+          repeat_interval: 1h
+
+    receivers:
+      - name: 'slack-notifications'
+        slack_configs:
+          - api_url: 'REPLACE_ME_SLACK_WEBHOOK'
+            channel: '#sre-alerts'
+            title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Namespace:* {{ .Labels.namespace }}
+              {{ end }}
+
+      - name: 'slack-critical'
+        slack_configs:
+          - api_url: 'REPLACE_ME_SLACK_WEBHOOK'
+            channel: '#sre-critical'
+            title: ':fire: CRITICAL: {{ .GroupLabels.alertname }}'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              {{ end }}
+
+    # Suppress child alerts when a parent alert is already firing
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['namespace']

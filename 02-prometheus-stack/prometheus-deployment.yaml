@@ -1,0 +1,102 @@
+# prometheus-deployment.yaml
+# Deploys the Prometheus server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      # ServiceAccount gives Prometheus permission to scrape K8s metrics
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.48.0
+          args:
+            # Where to find the config file
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            # Where to store time series data
+            - "--storage.tsdb.path=/prometheus"
+            # How long to keep data
+            - "--storage.tsdb.retention.time=15d"
+            # Enable the web UI and API
+            - "--web.enable-lifecycle"
+          ports:
+            - containerPort: 9090
+          # Resource limits prevent Prometheus from starving other pods
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: storage
+              mountPath: /prometheus
+          # Liveness probe restarts Prometheus if it becomes unresponsive
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          # Readiness probe stops traffic until Prometheus is ready
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        # emptyDir is ephemeral — in production use a PVC for persistence
+        - name: storage
+          emptyDir: {}
+---
+# ServiceAccount for Prometheus to access K8s API
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+# ClusterRole gives Prometheus read access to K8s resources for service discovery
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions", "apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring

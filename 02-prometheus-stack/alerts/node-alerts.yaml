@@ -1,0 +1,51 @@
+# node-alerts.yaml
+# Alerting rules for node-level health
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-alert-rules
+  namespace: monitoring
+data:
+  node-alerts.yaml: |
+    groups:
+      - name: node-alerts
+        rules:
+          # Alert when node CPU usage exceeds 80% for 5 minutes
+          - alert: NodeCPUHigh
+            expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node CPU usage is high"
+              description: "Node {{ $labels.instance }} CPU usage is {{ $value | humanize }}%"
+
+          # Alert when node memory usage exceeds 85%
+          - alert: NodeMemoryHigh
+            expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node memory usage is high"
+              description: "Node {{ $labels.instance }} memory usage is {{ $value | humanize }}%"
+
+          # Alert when node disk usage exceeds 85%
+          - alert: NodeDiskHigh
+            expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Node disk usage is high"
+              description: "Node {{ $labels.instance }} disk usage is {{ $value | humanize }}%"
+
+          # Alert when a node is not ready
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node is not ready"
+              description: "Node {{ $labels.node }} has been not ready for more than 2 minutes"
