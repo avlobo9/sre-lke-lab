@@ -1,0 +1,30 @@
+# terraform.tfvars.example
+#
+# Copy this file to terraform.tfvars and fill in your real values
+# terraform.tfvars is gitignored so your token is never committed
+#
+# cp terraform.tfvars.example terraform.tfvars
+
+# REPLACE_ME — Your Linode API token
+linode_token = "REPLACE_ME"
+
+# Cluster name — change this to anything you like
+cluster_name = "sre-lab"
+
+# Kubernetes version — must be a version supported by LKE
+# Check with: linode-cli lke versions-list
+k8s_version = "1.29"
+
+# Region closest to you
+# Check with: linode-cli regions list
+region = "us-east"
+
+# Environment tag
+environment = "lab"
+
+# Node plan — g6-standard-2 = 2 vCPU, 4GB RAM (~$18/month per node)
+# Check all plans with: linode-cli linodes types
+node_type = "g6-standard-2"
+
+# Number of worker nodes
+node_count = 3

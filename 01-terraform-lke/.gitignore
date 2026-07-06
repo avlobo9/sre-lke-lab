@@ -1,0 +1,7 @@
+# Never commit these files
+terraform.tfvars
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfplan
