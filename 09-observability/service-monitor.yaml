@@ -1,0 +1,28 @@
+# service-monitor.yaml
+# ServiceMonitor tells the Prometheus Operator which services to scrape
+# Requires the Prometheus Operator to be installed in the cluster
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: production-app-monitor
+  namespace: monitoring
+  labels:
+    # This label must match the Prometheus Operator's serviceMonitorSelector
+    release: prometheus
+spec:
+  # Which namespaces to look for services in
+  namespaceSelector:
+    matchNames:
+      - production
+  # Which services to scrape
+  selector:
+    matchLabels:
+      app: production-app
+  endpoints:
+    - port: http-metrics
+      # How often to scrape
+      interval: 30s
+      # Path to scrape metrics from
+      path: /metrics
+      # Timeout for each scrape
+      scrapeTimeout: 10s

@@ -1,0 +1,86 @@
+# prometheus-rules.yaml
+# PrometheusRule defines alerting rules for the Prometheus Operator
+# These alerts cover the most common production issues on LKE
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lke-sre-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: pod-alerts
+      interval: 30s
+      rules:
+        # Alert when a pod is in CrashLoopBackOff for more than 5 minutes
+        - alert: PodCrashLoopBackOff
+          expr: |
+            kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} is in CrashLoopBackOff"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in CrashLoopBackOff for more than 5 minutes."
+
+        # Alert when a deployment has no available replicas
+        - alert: DeploymentUnavailable
+          expr: |
+            kube_deployment_status_replicas_available == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Deployment {{ $labels.deployment }} has no available replicas"
+            description: "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} has had 0 available replicas for more than 2 minutes."
+
+        # Alert when a pod has restarted more than 5 times in an hour
+        - alert: PodFrequentRestarts
+          expr: |
+            increase(kube_pod_container_status_restarts_total[1h]) > 5
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.pod }} is restarting frequently"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted more than 5 times in the last hour."
+
+    - name: node-alerts
+      interval: 30s
+      rules:
+        # Alert when node memory usage exceeds 85%
+        - alert: NodeMemoryHigh
+          expr: |
+            (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.node }} memory usage is high"
+            description: "Node {{ $labels.node }} memory usage has been above 85% for more than 5 minutes."
+
+        # Alert when a node is NotReady
+        - alert: NodeNotReady
+          expr: |
+            kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} is NotReady"
+            description: "Node {{ $labels.node }} has been in NotReady state for more than 2 minutes."
+
+    - name: storage-alerts
+      interval: 30s
+      rules:
+        # Alert when a PVC is stuck in Pending for more than 5 minutes
+        - alert: PVCPending
+          expr: |
+            kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PVC {{ $labels.persistentvolumeclaim }} is stuck in Pending"
+            description: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} has been Pending for more than 5 minutes. Check CSI driver logs."
