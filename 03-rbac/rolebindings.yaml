@@ -1,0 +1,48 @@
+# rolebindings.yaml
+# RoleBindings attach a Role to a subject (user, group, or service account)
+# within a specific namespace
+
+# Bind dev-app service account to read-only role in dev namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-app-readonly
+  namespace: dev
+subjects:
+  - kind: ServiceAccount
+    name: dev-app
+    namespace: dev
+roleRef:
+  kind: Role
+  name: dev-readonly
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind staging-app service account to deployer role in staging namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: staging-app-deployer
+  namespace: staging
+subjects:
+  - kind: ServiceAccount
+    name: staging-app
+    namespace: staging
+roleRef:
+  kind: Role
+  name: staging-deployer
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind prod-app service account to admin role in production namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prod-app-admin
+  namespace: production
+subjects:
+  - kind: ServiceAccount
+    name: prod-app
+    namespace: production
+roleRef:
+  kind: Role
+  name: production-admin
+  apiGroup: rbac.authorization.k8s.io
