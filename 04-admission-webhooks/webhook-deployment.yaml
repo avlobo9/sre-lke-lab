@@ -1,0 +1,124 @@
+# webhook-deployment.yaml
+# Deploys the admission webhook server
+# This is a simple Python Flask server that validates pod resource limits
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admission-webhook
+  namespace: default
+  labels:
+    app: admission-webhook
+spec:
+  # Run 2 replicas so the webhook stays available during node failures
+  # A single replica webhook is a single point of failure for the entire cluster
+  replicas: 2
+  selector:
+    matchLabels:
+      app: admission-webhook
+  template:
+    metadata:
+      labels:
+        app: admission-webhook
+    spec:
+      containers:
+        - name: webhook
+          # This image runs a simple Python Flask admission webhook server
+          # See webhook_server.py below for the implementation
+          image: python:3.11-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              pip install flask --quiet && python3 /app/webhook_server.py
+          ports:
+            - containerPort: 8443
+              name: webhook-https
+          # TLS certificates mounted from the secret created in Step 2
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /tls
+              readOnly: true
+            - name: webhook-code
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: webhook-tls
+        - name: webhook-code
+          configMap:
+            name: webhook-server-code
+---
+# ConfigMap containing the Python webhook server code
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webhook-server-code
+  namespace: default
+data:
+  webhook_server.py: |
+    import json
+    import ssl
+    from flask import Flask, request, jsonify
+
+    app = Flask(__name__)
+
+    def validate_resource_limits(pod_spec):
+        """
+        Check every container in the pod spec has resource limits set.
+        Returns (allowed, message)
+        """
+        containers = pod_spec.get("containers", [])
+        for container in containers:
+            resources = container.get("resources", {})
+            limits = resources.get("limits", {})
+            if not limits.get("cpu") or not limits.get("memory"):
+                return False, f"container {container['name']} is missing resource limits"
+        return True, "all containers have resource limits"
+
+    @app.route("/validate", methods=["POST"])
+    def validate():
+        # Parse the AdmissionReview request from the API server
+        admission_review = request.get_json()
+        uid = admission_review["request"]["uid"]
+        pod_spec = admission_review["request"]["object"]["spec"]
+
+        allowed, message = validate_resource_limits(pod_spec)
+
+        # Build the AdmissionReview response
+        response = {
+            "apiVersion": "admission.k8s.io/v1",
+            "kind": "AdmissionReview",
+            "response": {
+                "uid": uid,
+                "allowed": allowed,
+            }
+        }
+        if not allowed:
+            response["response"]["status"] = {
+                "code": 403,
+                "message": message
+            }
+        return jsonify(response)
+
+    @app.route("/healthz", methods=["GET"])
+    def healthz():
+        return jsonify({"status": "ok"})
+
+    if __name__ == "__main__":
+        # Run with TLS using the certificates mounted from the secret
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain("/tls/tls.crt", "/tls/tls.key")
+        app.run(host="0.0.0.0", port=8443, ssl_context=context)

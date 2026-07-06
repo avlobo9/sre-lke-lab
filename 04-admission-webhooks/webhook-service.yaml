@@ -1,0 +1,19 @@
+# webhook-service.yaml
+# Exposes the webhook server inside the cluster
+# The API server calls this service when a pod is created
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-service
+  namespace: default
+  labels:
+    app: admission-webhook
+spec:
+  selector:
+    app: admission-webhook
+  ports:
+    - name: https
+      port: 443
+      # The webhook server listens on 8443 internally
+      # Port 443 externally maps to 8443 on the container
+      targetPort: 8443

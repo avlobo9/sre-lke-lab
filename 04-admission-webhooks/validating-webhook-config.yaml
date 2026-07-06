@@ -1,0 +1,48 @@
+# validating-webhook-config.yaml
+# Registers the webhook with the Kubernetes API server
+# The API server will call our webhook for every pod creation
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: resource-limits-validator
+webhooks:
+  - name: validate-resource-limits.sre-lab.io
+    # Rules define which resources trigger this webhook
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        # Only intercept CREATE operations
+        # You could also add UPDATE to catch changes to existing pods
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: "Namespaced"
+    # Where to send the webhook request
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: default
+        path: /validate
+        port: 443
+      # CA bundle used by the API server to verify the webhook's TLS certificate
+      # Replace this with the base64-encoded CA cert from Step 4
+      caBundle: REPLACE_ME_CA_BUNDLE
+    # What to do if the webhook server is unreachable
+    # Fail = reject all pods if webhook is down (safer but risky)
+    # Ignore = allow all pods if webhook is down (less safe)
+    # In production, use Ignore with monitoring so you know when it is down
+    failurePolicy: Ignore
+    # Only validate pods in these namespaces
+    # Remove namespaceSelector to validate all namespaces
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            # Exclude system namespaces to avoid breaking the cluster
+            - kube-system
+            - kube-public
+            - monitoring
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    # Timeout for the webhook call — keep this low to avoid slowing down pod creation
+    timeoutSeconds: 5
